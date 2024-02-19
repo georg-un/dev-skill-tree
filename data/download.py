@@ -3,7 +3,7 @@ import os
 import internetarchive as ia
 import py7zr
 
-from keys import INTERNET_ARCHIVE_ACCESS_KEY, INTERNET_ARCHIVE_SECRET_KET
+from config import INTERNET_ARCHIVE_ACCESS_KEY, INTERNET_ARCHIVE_SECRET_KET
 
 DOWNLOAD_FOLDER = "raw/"
 
@@ -11,14 +11,9 @@ ARCHIVE = "stackexchange"
 
 # see https://archive.org/download/stackexchange
 FILES = (
-    "stackoverflow.com-Badges.7z",
-    "stackoverflow.com-Comments.7z",
-    "stackoverflow.com-PostHistory.7z",
-    "stackoverflow.com-PostLinks.7z",
     "stackoverflow.com-Posts.7z",
     "stackoverflow.com-Tags.7z",
     "stackoverflow.com-Users.7z",
-    "stackoverflow.com-Votes.7z",
 )
 
 # see https://internetarchive.readthedocs.io/en/stable/internetarchive.html#internetarchive.api.get_session
