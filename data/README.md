@@ -67,3 +67,13 @@ For the full data pipeline, execute the following steps in the same order as the
       python ./load-into-db.py
       ```
       Note: this step will probably take multiple hours.
+3. ### Download the tag synonyms
+   Tags can be synonyms for other tags but, as of now, this mapping is not included in the StackExchange data dump.
+   Therefore, we have to fetch it from the StackExchange API and write it to the database ourselves.
+   To do that, run the following script:  
+   ```bash
+   python ./get-tag-synonyms.py
+   ```
+   Note: since the data in your database is probably a few months old, the API will return some tags that don't exist
+   yet in the database. These tags will be ignored and the info `Tag not found in Tags table: <tag-name>` 
+   will be printed to the console. This is expected and just for your info.

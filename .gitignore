@@ -131,3 +131,7 @@ dist
 
 # idea
 .idea/
+
+# StackExchange data dump files
+data/raw/*.7z
+data/raw/*.xml

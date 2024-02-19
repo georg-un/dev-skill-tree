@@ -1,3 +1,4 @@
+requests == 2.31.0
 internetarchive == 3.6.0
 py7zr == 0.20.8
 psycopg == 3.1.18
