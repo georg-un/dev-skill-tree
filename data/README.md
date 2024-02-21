@@ -77,8 +77,14 @@ For the full data pipeline, execute the following steps in the same order as the
    Note: since the data in your database is probably a few months old, the API will return some tags that don't exist
    yet in the database. These tags will be ignored and the info `Tag not found in Tags table: <tag-name>` 
    will be printed to the console. This is expected and just for your info.
-4. ### Generate the tag-pair counts
-   Next, we generate a database table that contains for each unique tag-pair how many times it was associated to a post:
+4. ### Filter the posts
+   Currently, the posts include answers to questions, closed questions, old and inactive questions, 
+   and questions with a negative score. Generate a table that contains only clean data by running:
+   ```bash
+   python ./filter-posts.py
+   ```
+5. ### Generate the tag-pair counts
+   Next, generate the table that contains for each unique tag-pair how many times it was associated to a post:
    ```bash
    python ./count-tag-pairs.py
    ```

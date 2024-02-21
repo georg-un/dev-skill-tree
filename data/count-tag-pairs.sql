@@ -1,8 +1,8 @@
 /*
-This SQL script creates a new table TagPairCounts that contains the counts of all unique tag pairs found in the Posts table.
+This SQL script creates a new table TagPairCounts that contains the counts of all unique tag pairs found in the FilteredPosts table.
 It accounts for tag synonyms by replacing any synonym tag with its corresponding primary tag before counting.
 The process involves three main steps:
-1. Un-nesting tags from the concatenated Tags field in the Posts table.
+1. Un-nesting tags from the concatenated Tags field in the FilteredPosts table.
 2. Resolving synonyms to their primary tags using the TagSynonyms table.
 3. Counting occurrences of each unique tag pair across all posts.
 */
@@ -17,7 +17,7 @@ WITH UnnestedTags AS (
         -- Split tags into individual elements, removing surrounding <>
         unnest(string_to_array(trim(both '<>' from p.Tags), '><')) AS OriginalTag
     FROM
-        Posts p
+        FilteredPosts p
 ),
 
 -- CTE to replace synonym tags with their primary tags
