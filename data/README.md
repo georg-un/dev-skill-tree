@@ -38,7 +38,7 @@ For the full data pipeline, execute the following steps in the same order as the
          - _stackoverflow.com-Posts.7z_,
          - _stackoverflow.com-Tags.7z_,
          - _stackoverflow.com-Users.7z_,
-      3. After the download is complete, extract the XML files and place them in the folder [/raw](./raw).
+      3. After the download is complete, extract the XML files and place them in the folder [raw/](./raw).
    - #### Option 2: Download the data with the downloader script:
       1. To download the StackOverflow dump from archive.org directly, you need to set your access credentials. 
          First, create an account on [archive.org](https://archive.org). 
@@ -88,3 +88,21 @@ For the full data pipeline, execute the following steps in the same order as the
    ```bash
    python ./count-tag-pairs.py
    ```
+6. ### Export the data
+   Finally, export the tags and the tag-pair counts with:
+   ```bash
+   python ./export-data.py
+   ```
+   This will create the files `tags.json` and `tag-pair-counts.json` in the folder [result/](./result).
+
+## Filters
+
+The following filters are used in the course of the data pipeline and have an impact on the final result:
+
+- In [step 4](./README.md#filter-the-posts), before counting the tag pairs:
+  - Closed questions are removed.
+  - Questions with a score lower than `-1` are removed.
+  - Questions with no activity after `2018-01-01` are removed.
+- In [step 6](./README.md#filter-the-posts), when generating the result JSONs:
+  - Tag-pairs with a count smaller than `2500` are removed.
+  - Tags that don't appear in the filtered tag-pairs list are removed.
