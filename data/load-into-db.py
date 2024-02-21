@@ -13,14 +13,14 @@ LOGFILE_PATH = "/tmp/load-into-db.log"
 TABLE_SCHEMAS = {
     'Posts': {
         'Id': 'INTEGER PRIMARY KEY',
-        'PostTypeId': 'INTEGER',
+        'PostTypeId': 'INTEGER',  # 1: Question, 2: Answer
         'ParentId': 'INTEGER',
         'AcceptedAnswerId': 'INTEGER',
         'CreationDate': 'TIMESTAMP',
         'Score': 'INTEGER',
         'ViewCount': 'INTEGER',
         'Body': 'TEXT',
-        'OwnerUserId': 'INTEGER',
+        'OwnerUserId': 'INTEGER',  # (present only if user has not been deleted)
         'OwnerDisplayName': 'TEXT',
         'LastEditorUserId': 'INTEGER',
         'LastEditorDisplayName': 'TEXT',

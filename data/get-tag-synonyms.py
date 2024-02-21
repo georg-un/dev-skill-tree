@@ -74,32 +74,31 @@ def store_tag_synonyms(synonyms: List[TagSynonymMapping]) -> None:
     # Ensure the TagSynonyms table exists
     cur.execute("""
             CREATE TABLE IF NOT EXISTS TagSynonyms (
-                PrimaryTagId INTEGER,
-                SynonymTagId INTEGER,
-                FOREIGN KEY (PrimaryTagId) REFERENCES Tags(Id),
-                FOREIGN KEY (SynonymTagId) REFERENCES Tags(Id),
-                UNIQUE(PrimaryTagId, SynonymTagId)
+                PrimaryTag TEXT,
+                SynonymTag TEXT
             );
         """)
     conn.commit()
 
-    for idx, synonym in enumerate(synonyms):
-        primary_tag_id = _get_tag_id(cur, synonym['to_tag'])
-        synonym_tag_id = _get_tag_id(cur, synonym['from_tag'])
+    for synonym in synonyms:
+        primary_tag = synonym['to_tag']
+        synonym_tag = synonym['from_tag']
+        primary_tag_id = _get_tag_id(cur, primary_tag)
+        synonym_tag_id = _get_tag_id(cur, synonym_tag)
 
-        if primary_tag_id and synonym_tag_id:
+        if primary_tag_id and synonym_tag_id:  # only insert the mapping pair if both tags exist in the Tags table
             try:
                 cur.execute(
-                    "INSERT INTO TagSynonyms (PrimaryTagId, SynonymTagId) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-                    (primary_tag_id, synonym_tag_id)
+                    "INSERT INTO TagSynonyms (PrimaryTag, SynonymTag) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                    (primary_tag, synonym_tag)
                 )
             except psycopg.Error as e:
                 print(f"Error inserting synonym {synonym}: {e}")
         else:
             if not primary_tag_id:
-                print(f"Tag not found in Tags table: {synonym['to_tag']}")
+                print(f"Tag not found in Tags table: {primary_tag}")
             if not synonym_tag_id:
-                print(f"Tag not found in Tags table: {synonym['from_tag']}")
+                print(f"Tag not found in Tags table: {synonym_tag}")
     conn.commit()
 
     cur.close()
