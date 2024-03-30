@@ -80,6 +80,7 @@ WITH UnnestedTags AS (
 SELECT
     Tag1,
     Tag2,
+    PairCount,
     NormalizedScore
 FROM
     NormalizedTagPairs

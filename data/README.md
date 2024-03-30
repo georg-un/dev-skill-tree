@@ -83,23 +83,18 @@ For the full data pipeline, execute the following steps in the same order as the
    ```bash
    python ./filter-posts.py
    ```
-5. ### Calculate the tag-pair counts
-   Next, generate the table that contains for each unique tag-pair how many times it was associated to a post:
-   ```bash
-   python ./count-tag-pairs.py
-   ```
-6. ### Calculate the tag-pair scores
+5. ### Calculate the tag-pair scores
    Weighting the tag-pair counts by how many times both tags are referenced in the dataset overall tends to yield better results.
    We call these weighted counts the "scores" of the tag-pairs. To calculate them, run:
    ```bash
    python ./score-tag-pairs.py
    ```
-7. ### Export the data
+6. ### Export the data
    Finally, export the tags and the tag-pair counts with:
    ```bash
    python ./export-data.py
    ```
-   This will create the files `tag-pair-counts.json`, `count-tags.json`, `tag-pair-scores.json`, and `score-tags.json` in the folder [result/](./result).
+   This will create the files `tags.json` and `tag-pairs.json` in the folder [result/](./result).
 
 ## Filters
 
@@ -109,7 +104,7 @@ The following filters are used in the course of the data pipeline and have an im
   - Closed questions are removed.
   - Questions with a score lower than `-1` are removed.
   - Questions with no activity after `2018-01-01` are removed.
-- In [step 5](./README.md#calculate-the-tag-pair-counts), when generating the result JSONs:
-  - Tag-pairs with a count smaller than `2500` are removed.
-  - Tag-pairs with a score smaller than `0.05` are removed.
-  - The generated tag files contain only those tags that appear in the respective score table.
+- In [step 6](./README.md#export-the-data), when generating the result JSONs:
+  - There's a tag count threshold of `5000`. 
+  - Tags with a count smaller than the threshold are removed.
+  - Tag pairs where one of the tags has a count smaller than the threshold are removed.
