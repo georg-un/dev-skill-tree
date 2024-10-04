@@ -5,3 +5,18 @@ body {
   min-width: 320px;
   min-height: 100vh;
 }
+
+:root {
+  --text: #102a42;
+  --background: #f1f4f8;
+  --primary: #829ab0;
+  --secondary: #bcccdc;
+  --accent: #48647f;
+  @media (prefers-color-scheme: dark) {
+    --text: #bdd7ef;
+    --background: #070a0e;
+    --primary: #4f677d;
+    --secondary: #233343;
+    --accent: #809cb7;
+  }
+}
