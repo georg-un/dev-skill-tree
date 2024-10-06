@@ -90,11 +90,16 @@ For the full data pipeline, execute the following steps in the same order as the
    python ./score-tag-pairs.py
    ```
 6. ### Export the data
-   Finally, export the tags and the tag-pair counts with:
+   Export the tags and the tag-pair counts as JSON with:
    ```bash
    python ./export-data.py
    ```
    This will create the files `tags.json` and `tag-pairs.json` in the folder [result/](./result).
+7. ### Calculate the weight
+   To stay flexible with how the weight is calculated, we have a separate step for that:
+   ```bash
+   python ./calculate-weight.py
+   ```
 
 ## Filters
 

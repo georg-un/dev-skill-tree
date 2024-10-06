@@ -38,11 +38,11 @@ def export_data():
     print(f"Number of tag-pairs: {len(tag_pairs)}.")
 
     # Save the results to JSON files
-    with open('./result/tag-pairs.json', 'w') as f:
-        json.dump(tag_pairs, f)
+    with open('./result/tag-pairs.json', 'w') as file:
+        json.dump(tag_pairs, file, indent=2)
 
-    with open('./result/tags.json', 'w') as f:
-        json.dump(resolved_tags, f)
+    with open('./result/tags.json', 'w') as file:
+        json.dump(resolved_tags, file, indent=2)
 
 
 if __name__ == '__main__':
