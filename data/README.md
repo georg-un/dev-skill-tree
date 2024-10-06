@@ -100,6 +100,11 @@ For the full data pipeline, execute the following steps in the same order as the
    ```bash
    python ./calculate-weight.py
    ```
+8. ### Generate the clusters
+   Next, we perform a hierarchical clustering:
+   ```bash
+   python ./cluster.py
+   ```
 
 ## Filters
 
