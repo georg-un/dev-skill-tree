@@ -54,11 +54,11 @@ export const Main = () => {
       <SigmaContainer style={{ height: "100vh", width: "70vw", backgroundColor: theme.background }}
                       settings={sigmaSettings}>
         <LoadGraph graphData={graphData}/>
-        <GraphEvents onNodeClick={setCurrentNodeId}/>
+        <GraphEvents onNodeClick={setCurrentNodeId} onStageClick={handleModalClose}/>
       </SigmaContainer>
       <div style={{ backgroundColor: theme.secondary, color: theme.text, width: '30vw' }}>
         {!!currentNode && <NodeModal node={currentNode} onClose={handleModalClose}
-                                     onSkillLevelChange={(skillLevel) => handleSkillLevelChange(currentNode.key, skillLevel)}/>}
+                                     onSkillLevelChange={(skillLevel) => handleSkillLevelChange(currentNode!.key, skillLevel)}/>}
       </div>
     </div>
   );
