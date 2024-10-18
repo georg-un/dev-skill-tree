@@ -1,8 +1,8 @@
 import { ChangeEvent, FC } from "react";
-import { NodeEntry } from "graphology-types";
+import { GraphNode } from "./types.ts";
 
 export interface NodeModalProps {
-  node: NodeEntry,
+  node: GraphNode,
   onClose: () => void,
   onSkillLevelChange: (skillLevel: number) => void;
 }

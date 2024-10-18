@@ -24,7 +24,10 @@ const LoadGraph = ({ graphData }: { graphData: object }) => {
 
 export const Main = () => {
   const theme = useTheme();
-  const { graphData, setSkill } = useGraphData();
+  const { graphData, setSkill } = useGraphData({
+    nodeEmptyColor: theme.primary,
+    nodeFilledColor: theme.isDarkMode ? '#FFFFFF' : '#000000'
+  });
   const [currentNodeId, setCurrentNodeId] = useState<string | null>(null);
 
   const sigmaSettings: Partial<Settings> = {
