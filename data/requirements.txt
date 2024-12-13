@@ -2,3 +2,9 @@ requests == 2.31.0
 internetarchive == 3.6.0
 py7zr == 0.20.8
 psycopg == 3.1.18
+scikit-network == 0.32.1
+numpy == 1.26.4
+scipy == 1.13.0
+neo4j == 5.27.0
+PyGithub == 2.5.0
+python-dotenv == 1.0.1
