@@ -1,17 +1,15 @@
-import os
-import time
 import json
 import logging
-from functools import partial, reduce
-from typing import Dict, List, Callable, Any, Optional, Union, Tuple
+import os
+import time
 from itertools import islice
+from typing import Dict, List, Callable, Any, Optional, Tuple
 
-import requests
-from github import Github, GithubException
-from github.Repository import Repository
-from github.ContentFile import ContentFile
-from neo4j import GraphDatabase, Driver, Session
 from dotenv import load_dotenv
+from github import Github, GithubException
+from github.ContentFile import ContentFile
+from github.Repository import Repository
+from neo4j import GraphDatabase, Driver, Session
 
 # Configure logging
 logging.basicConfig(
@@ -82,7 +80,7 @@ def find_package_jsons(
         return []
 
 
-def parse_package_file(package_file: ContentFile, root_package_file: Optional[ContentFile]) -> Dict[str, Dict[str, str]]:
+def parse_package_file_dependencies(package_file: ContentFile, root_package_file: Optional[ContentFile]) -> Dict[str, Dict[str, str]]:
     """
     Take a package file and, optionally, its root package file and parse the dependencies.
     If a root package file is provided, the devDependencies of both files are merged in the final output.
@@ -115,70 +113,76 @@ def parse_package_file(package_file: ContentFile, root_package_file: Optional[Co
 def store_in_database(
         session: Session,
         repo: Repository,
-        dependencies: Dict[str, Any]
+        dependencies: Dict[str, Dict[str, str]]
 ) -> None:
     """Create Neo4j graph transaction for a repository"""
 
     """
         NOTES
         - Including the versions of repos or dependencies blows up complexity. Ignore them for now.
-        - Workflow:
+        - Workflow in neo4j:
             - Create/update repo node.
             - For each dep, create a node if it doesn't exist yet.
             - Create edges between nodes.
     """
 
-    def upsert_repo_node() -> None:
+    def upsert_repo_node(repo: Repository) -> None:
+        """Upsert the repo information (stars, url, ...) of a package in the database"""
         session.run("""
-        MERGE (package:Package {name: $name, stars: $stars, url: $url})
+        MERGE (package:Package {
+            name: $name,
+            stars: $stars,
+            watchers: $watchers,
+            open_issues: $open_issues,
+            contributors: $contributors,
+            last_modified: datetime($last_modified),
+            url: $url
+        })
         """, {
             'name': repo.full_name,
             'stars': repo.stargazers_count,
+            'watchers': repo.watchers_count,
+            'open_issues': repo.open_issues_count,
+            'contributors': repo.get_contributors().totalCount,
+            'last_modified': repo.updated_at.isoformat(),
             'url': repo.html_url,
         })
 
-    def add_dependencies(dep_type: str, relationship: str) -> None:
-        for package_name, version in dependencies[dep_type].items():
-            session.run(f"""
-            MERGE (pkg:Package {{name: $package_name}})
-            MERGE (repo)-[:{relationship} {{version: $version}}]->(pkg)
-            """, {
-                'package_name': package_name,
-                'version': version
-            })
+    def upsert_dependency_node(dependency: str) -> None:
+        """Insert a dependency as package node if it doesn't exist yet."""
+        session.run("""
+        MERGE (package:Package {name: $name})
+        """, {
+            'name': dependency
+        })
 
-    create_repo_node()
-    add_dependencies('dependencies', 'PROD_DEPENDENCY')
-    add_dependencies('peerDependencies', 'PEER_DEPENDENCY')
-    add_dependencies('devDependencies', 'DEV_DEPENDENCY')
+    def insert_dependency_edge(repo_name: str, dependency: str, relationship: str) -> None:
+        """Insert a dependency edge from one package to the other"""
+        session.run(f"""
+        MATCH (repo:Package {{name: $repo_name}})
+        MATCH (pkg:Package {{name: $dependency}})
+        MERGE (repo)-[:{relationship}]->(pkg)
+        """, {
+            'repo_name': repo_name,
+            'dependency': dependency
+        })
 
+    def get_edge_name(dependency_type: str) -> str:
+        match dependency_type:
+            case 'dependencies':
+                return 'PROD_DEPENDENCY'
+            case 'peerDependencies':
+                return 'PEER_DEPENDENCY'
+            case 'devDependencies':
+                return 'DEV_DEPENDENCY'
 
-# def process_repository2(
-#        driver: Driver,
-#        repo: Repository
-# ) -> None:
-#    """Process a single repository"""
-#    logger.info(f"Processing {repo.full_name}")
-#
-#    try:
-#       # Find package.json files
-#       package_jsons = find_package_jsons(repo)
-#
-#        if not package_jsons:
-#            logger.info(f"No package.json found in {repo.full_name}")
-#            return
-#
-#        # Extract and merge dependencies
-#        dependencies = parse_package_jsons(package_jsons)
-#
-#        # Create graph transaction
-#        with driver.session() as session:
-#            create_graph_transaction(session, repo, dependencies)
-#
-#        logger.info(f"Processed {repo.full_name} successfully")
-#
-#    except Exception as e:
-#        logger.error(f"Failed to process {repo.full_name}: {e}")
+    upsert_repo_node(repo)
+
+    for dependency_type in dependencies:
+        for dependency_name in dependencies.get(dependency_type):
+            upsert_dependency_node(dependency_name)
+            edge_name = get_edge_name(dependency_type)
+            insert_dependency_edge(repo.full_name, dependency_name, edge_name)
 
 
 def find_root_package_file(package_files: List[ContentFile]) -> Optional[ContentFile]:
@@ -204,8 +208,13 @@ def extract_root_package_file(package_files: List[ContentFile]) -> Tuple[List[Co
     return package_files, None
 
 
-def process_package_files(package_files: List[ContentFile]):
+def process_package_files(session: Session, repo: Repository, package_files: List[ContentFile]):
     [non_root_package_files, root_package_file] = extract_root_package_file(package_files)
+
+    for non_root_package_file in non_root_package_files:
+        dependencies = parse_package_file_dependencies(non_root_package_file, root_package_file)
+        store_in_database(session, repo, dependencies)
+
 
 def process_repository(
         driver: Driver,
@@ -215,59 +224,24 @@ def process_repository(
     logger.info(f"Processing {repo.full_name}")
 
     """
-           TODO: WHAT WE ACTUALLY NEED TO DO:
+       Notes:
 
-           If we only find one package.json --> use that one
-           If we find multiple package.json:
-               Check if they have a workspaces property.
-               If one has a workspace prop and references the folder of the other, that's the root
-               If none of them has a workspace prop, they're siblings
-
-               If there is no hierarchy --> process them sequentially individually
-               If there is a hierarchy, process them recursively
-
-           Processing of flat package.json files:
-               Return dependencies, devDependencies, peerDependencies, and metadata
-
-           Processing of monorepo package.json files:
-                First, get all package.json files. Children, grandchildren, ...
-                Merge them sequentially.
-
-
-           Notes:
-
-           Pay attention to file references (e.g. "myDep": "file: ../...")!
-           monitor how many repos have a parent.repo. That tells you if you should include sub-repos.
-           
-           I think we should store the repository information on the package node. 
-           In the case of a monorepo, we store it multiple times but most repos are probably not monorepos anyways.
-
-           Also relevant (for security analysis):
-           repo.get_contributors().totalCount
-           repo.last_modified             
-           """
+       Pay attention to file references (e.g. "myDep": "file: ../...")!
+       monitor how many repos have a parent.repo. That tells you if you should include sub-repos.
+       
+       I think we should store the repository information on the package node. 
+       In the case of a monorepo, we store it multiple times but most repos are probably not monorepos anyways.
+   """
 
     try:
-        # Find package.json files
         package_jsons = find_package_jsons(repo)
 
         if not package_jsons:
             logger.info(f"No package.json found in {repo.full_name}")
             return
 
-        [print(file.path) for file in package_jsons]
-
-        if len(package_jsons) != 1:
-            return
-
-        # Extract and merge dependencies
-        dependencies = parse_dependencies(package_jsons[0])
-        print(dependencies)
-
-        # Create graph transaction
-        # with driver.session() as session:
-        #    create_graph_transaction(session, repo, dependencies)
-        # print(dependencies)
+        with driver.session() as session:
+            process_package_files(session, repo, package_jsons)
 
         logger.info(f"Processed {repo.full_name} successfully")
 
