@@ -35,6 +35,6 @@ Python project to crawl GitHub for JavaScript and TypeScript repositories and bu
 
 1. Crawl GitHub and load the data into Neo4j (this will take very long).
    ```bash
-   python3 ./crawl-github.py
+   python3 ./1_crawl_github.py
    ```
 2. You can explore the Neo4j graph visually in the [Neo4j browser](http://localhost:7474/browser/) (URL depends on your configuration).

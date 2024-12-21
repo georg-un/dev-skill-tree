@@ -1,46 +1,18 @@
 import json
-import logging
 import os
-import time
 from itertools import islice
-from typing import Dict, List, Callable, Any, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 from github import Github, GithubException
 from github.ContentFile import ContentFile
 from github.Repository import Repository
-from neo4j import GraphDatabase, Driver, Session
+from neo4j import Driver, Session
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+from connect_neo4j import connect_neo4j
+from setup_logger import setup_logger
 
-
-def retry_with_backoff(
-        func: Callable[..., Any],
-        *args: Any,
-        max_retries: int = 5,
-        base_delay: int = 2
-) -> Any:
-    """Functional retry mechanism with exponential backoff"""
-
-    # TODO: If rate limited, wait
-    def attempt(attempt_num: int) -> Any:
-        try:
-            return func(*args)
-        except Exception as e:
-            if attempt_num >= max_retries:
-                logger.error(f"Operation failed after {max_retries} attempts: {e}")
-                raise
-            delay = base_delay * (2 ** attempt_num)
-            logger.warning(f"Retry {attempt_num + 1} failed. Retrying in {delay} seconds. Error: {e}")
-            time.sleep(delay)
-            return attempt(attempt_num + 1)
-
-    return attempt(0)
+logger = setup_logger(__name__)
 
 
 def find_package_jsons(
@@ -61,7 +33,7 @@ def find_package_jsons(
             try:
                 if content.type == 'dir':
                     # Recursively search directories
-                    dir_contents = retry_with_backoff(repo.get_contents, content.path)
+                    dir_contents = repo.get_contents(content.path)
                     found_packages.extend(
                         search_contents(dir_contents, current_depth + 1)
                     )
@@ -73,7 +45,7 @@ def find_package_jsons(
         return found_packages
 
     try:
-        root_contents = retry_with_backoff(repo.get_contents, "/")
+        root_contents = repo.get_contents("/")
         return search_contents(root_contents)
     except Exception as e:
         logger.error(f"Could not find package.json in {repo.full_name}: {e}")
@@ -125,7 +97,6 @@ def store_in_database(
             - For each dep, create a node if it doesn't exist yet.
             - Create edges between nodes.
     """
-
     def upsert_repo_node(repo: Repository) -> None:
         """Upsert the repo information (stars, url, ...) of a package in the database"""
         session.run("""
@@ -271,21 +242,15 @@ def crawl_github(
         logger.error(f"Error while crawling GitHub: {e}")
 
 
-def main() -> None:
-    """Main entry point for the crawler"""
+if __name__ == "__main__":
     load_dotenv()
-
-    # Create Neo4j driver
-    driver = GraphDatabase.driver(
-        os.getenv('NEO4J_URI'),
-        auth=(os.getenv('NEO4J_USER'), os.getenv('NEO4J_PASSWORD'))
-    )
+    driver = connect_neo4j()
+    github_token = os.getenv('GITHUB_TOKEN')
 
     try:
-        # Crawl GitHub ecosystem
         crawl_github(
             driver,
-            os.getenv('GITHUB_TOKEN'),
+            github_token,
             stars_query="1234",
             max_repos=100_000
         )
@@ -293,7 +258,3 @@ def main() -> None:
         logger.error(f"Crawler failed: {e}")
     finally:
         driver.close()
-
-
-if __name__ == "__main__":
-    main()
