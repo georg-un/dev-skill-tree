@@ -12,7 +12,7 @@ AND type(r2) IN ["PROD_DEPENDENCY", "PEER_DEPENDENCY", "DEV_DEPENDENCY"]
 
 // Aggregate and filter by minimum threshold
 WITH target, connected, count(DISTINCT source) as occurrence_count
-WHERE occurrence_count >= 3
+WHERE occurrence_count >= $min_occurrence_count
 
 // Create CO_OCCURRENCE relationships
 CREATE (target)-[r:CO_OCCURRENCE {count: occurrence_count}]->(connected)

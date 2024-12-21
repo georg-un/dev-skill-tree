@@ -1,6 +1,6 @@
+import argparse
 import json
 import os
-from itertools import islice
 from typing import Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
@@ -20,7 +20,6 @@ def find_package_jsons(
         max_depth: int = 3,
 ) -> List[ContentFile]:
     """Recursively find package.json files in a repository"""
-
     def search_contents(
             contents: List[ContentFile],
             current_depth: int = 0
@@ -224,7 +223,6 @@ def crawl_github(
         driver: Driver,
         github_token: str,
         stars_query: str = ">10000",
-        max_repos: int = 100_000
 ) -> None:
     """Crawl GitHub repositories and build ecosystem graph"""
     github = Github(github_token)
@@ -233,27 +231,38 @@ def crawl_github(
     query_ts = f"stars:{stars_query} language:TypeScript"
 
     try:
+        js_repos = github.search_repositories(query_js)
+        ts_repos = github.search_repositories(query_ts)
+        logger.info(f"Processing {js_repos.totalCount} JavaScript and {ts_repos.totalCount} TypeScript repos.")
+
         # Paginate through repositories
-        for repo in islice(github.search_repositories(query_js), max_repos): # JavaScript
+        for repo in js_repos:
             process_repository(driver, repo)
-        for repo in islice(github.search_repositories(query_ts), max_repos): # TypeScript
+        for repo in ts_repos:
             process_repository(driver, repo)
+
     except Exception as e:
         logger.error(f"Error while crawling GitHub: {e}")
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="""
+        Crawl GitHub for JavaScript and TypeScript repositories.
+        Use their package.json files to create a dependency graph and store it in a Neo4j database.
+        """
+    )
+    parser.add_argument("--min_stars", type=int, help="Minimum number of stars a repo needs to have.")
+    args = parser.parse_args()
+
+    stars_query = f">{args.min_stars}" if args.min_stars else "1234"
+
     load_dotenv()
     driver = connect_neo4j()
     github_token = os.getenv('GITHUB_TOKEN')
 
     try:
-        crawl_github(
-            driver,
-            github_token,
-            stars_query="1234",
-            max_repos=100_000
-        )
+        crawl_github(driver, github_token, stars_query)
     except Exception as e:
         logger.error(f"Crawler failed: {e}")
     finally:
