@@ -3,7 +3,7 @@ import time
 import json
 import logging
 from functools import partial, reduce
-from typing import Dict, List, Callable, Any, Optional, Union
+from typing import Dict, List, Callable, Any, Optional, Union, Tuple
 from itertools import islice
 
 import requests
@@ -28,6 +28,7 @@ def retry_with_backoff(
         base_delay: int = 2
 ) -> Any:
     """Functional retry mechanism with exponential backoff"""
+
     # TODO: If rate limited, wait
     def attempt(attempt_num: int) -> Any:
         try:
@@ -81,45 +82,55 @@ def find_package_jsons(
         return []
 
 
-def parse_package_jsons2(package_jsons: List[ContentFile]) -> Dict[str, Dict[str, str]]:
-    """Merge dependencies from multiple package.json files"""
+def parse_package_file(package_file: ContentFile, root_package_file: Optional[ContentFile]) -> Dict[str, Dict[str, str]]:
+    """
+    Take a package file and, optionally, its root package file and parse the dependencies.
+    If a root package file is provided, the devDependencies of both files are merged in the final output.
 
-    def extract_deps(package_file: ContentFile) -> Dict[str, Dict[str, str]]:
+    :param package_file:        The package file to process
+    :param root_package_file:   A root package file that can be provided in the case of a monorepo
+    :return:                    A dictionary of dependencies and metadata, e.g. { dependencies: { lodash: 1.3.0 } }
+    """
+    def extract_deps(file: ContentFile) -> Dict[str, Dict[str, str]]:
         try:
-            data = json.loads(package_file.decoded_content.decode('utf-8'))
+            data = json.loads(file.decoded_content.decode('utf-8'))
             return {
                 'dependencies': data.get('dependencies', {}),
+                'peerDependencies': data.get('peerDependencies', {}),
                 'devDependencies': data.get('devDependencies', {}),
-                'workspaces': data.get('workspaces', [])
             }
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
-            logger.warning(f"Could not parse {package_file.path}: {e}")
-            return {'dependencies': {}, 'devDependencies': {}, 'workspaces': []}
+            logger.warning(f"Could not parse {file.path}: {e}")
+            return {'dependencies': {}, 'peerDependencies': {}, 'devDependencies': []}
 
-    def merge_deps(
-            acc: Dict[str, Dict[str, str]],
-            deps: Dict[str, Dict[str, str]]
-    ) -> Dict[str, Dict[str, str]]:
-        return {
-            'dependencies': acc['dependencies'],
-            'devDependencies': {**acc['devDependencies'], **deps['devDependencies']},
-            'workspaces': list(set(acc.get('workspaces', []) + deps.get('workspaces', [])))
-        }
+    parsed_file = extract_deps(package_file)
 
-    return reduce(merge_deps, map(extract_deps, package_jsons),
-                  {'dependencies': {}, 'devDependencies': {}, 'workspaces': []})
+    if root_package_file:
+        parsed_root_file = extract_deps(root_package_file)
+        parsed_file['devDependencies'] = {**parsed_root_file.get('devDependencies'), **parsed_file.get('devDependencies')}
+
+    return parsed_file
 
 
-def create_graph_transaction(
+def store_in_database(
         session: Session,
         repo: Repository,
         dependencies: Dict[str, Any]
 ) -> None:
     """Create Neo4j graph transaction for a repository"""
 
-    def create_repo_node() -> None:
+    """
+        NOTES
+        - Including the versions of repos or dependencies blows up complexity. Ignore them for now.
+        - Workflow:
+            - Create/update repo node.
+            - For each dep, create a node if it doesn't exist yet.
+            - Create edges between nodes.
+    """
+
+    def upsert_repo_node() -> None:
         session.run("""
-        MERGE (repo:Repository {name: $name, stars: $stars, url: $url})
+        MERGE (package:Package {name: $name, stars: $stars, url: $url})
         """, {
             'name': repo.full_name,
             'stars': repo.stargazers_count,
@@ -138,13 +149,14 @@ def create_graph_transaction(
 
     create_repo_node()
     add_dependencies('dependencies', 'PROD_DEPENDENCY')
+    add_dependencies('peerDependencies', 'PEER_DEPENDENCY')
     add_dependencies('devDependencies', 'DEV_DEPENDENCY')
 
 
-#def process_repository2(
+# def process_repository2(
 #        driver: Driver,
 #        repo: Repository
-#) -> None:
+# ) -> None:
 #    """Process a single repository"""
 #    logger.info(f"Processing {repo.full_name}")
 #
@@ -169,72 +181,31 @@ def create_graph_transaction(
 #        logger.error(f"Failed to process {repo.full_name}: {e}")
 
 
-def parse_dependencies(package_json: ContentFile, parent_package_jsons: Optional[List[ContentFile]] = None) -> Dict[
-    str, Dict[str, str]]:
-    """
-    Extract dependencies from package.json file.
-
-    If parent package.json files are provided, their devDependencies are merged into the extracted devDependencies.
-    """
-
-    if parent_package_jsons is None:
-        parent_package_jsons = []
-
-    def extract_deps(package_file: ContentFile) -> Dict[str, Dict[str, str]]:
-        try:
-            data = json.loads(package_file.decoded_content.decode('utf-8'))
-            return {
-                'dependencies': data.get('dependencies', {}),
-                'peerDependencies': data.get('peerDependencies', {}),
-                'devDependencies': data.get('devDependencies', {})
-            }
-        except (json.JSONDecodeError, UnicodeDecodeError) as e:
-            logger.warning(f"Could not parse {package_file.path}: {e}")
-            return {'dependencies': {}, 'peerDependencies': {}, 'devDependencies': {}}
-
-    def merge_dev_dependencies(
-            acc: Dict[str, str],
-            curr: Dict[str, str]
-    ) -> Dict[str, str]:
-        return {**acc, **curr}
-
-    return {
-        'dependencies': extract_deps(package_json).get('dependencies', {}),
-        'peerDependencies': extract_deps(package_json).get('peerDependencies', {}),
-        'devDependencies': reduce(merge_dev_dependencies,
-                                  (extract_deps(pkg).get('devDependencies', {}) for pkg in
-                                   [package_json] + parent_package_jsons),
-                                  {})
-    }
-
-def is_parent_of_other_package_json(package_file: ContentFile, other_package_file: ContentFile):
-    """Check if one package.json file is a parent of the other package.json file"""
-    package_file_data = json.loads(package_file.decoded_content.decode('utf-8'))
-    if not package_file_data.get('workspaces'):
-        return False
-
-    package_file_path = os.path.dirname(package_file.path)
-    other_package_path = os.path.dirname(other_package_file.path)
-    for workspace in package_file_data['workspaces']:
-        workspace_path = os.path.join(package_file_path, workspace)
-        if os.path.commonpath([workspace_path, other_package_path]) == workspace_path:
-            return True
-    return False
-
-def is_monorepo(package_files: List[ContentFile]) -> bool:
-    """Check if any of the package.json files contains the 'workspaces' property"""
+def find_root_package_file(package_files: List[ContentFile]) -> Optional[ContentFile]:
+    """Find the root package.json file if there is one."""
     for package_file in package_files:
         try:
             data = json.loads(package_file.decoded_content.decode('utf-8'))
             if 'workspaces' in data:
-                return True
+                return package_file
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
             logger.warning(f"Could not parse {package_file.path}: {e}")
-    return False
+        return None
+
+
+def extract_root_package_file(package_files: List[ContentFile]) -> Tuple[List[ContentFile], Optional[ContentFile]]:
+    """
+        Take a list of all package files and extract the root package file from it.
+        Return a tuple containing all non-root package files and, if found, the root package file.
+    """
+    root_package_file = find_root_package_file(package_files)
+    if root_package_file:
+        return [file for file in package_files if file != root_package_file], root_package_file
+    return package_files, None
 
 
 def process_package_files(package_files: List[ContentFile]):
-
+    [non_root_package_files, root_package_file] = extract_root_package_file(package_files)
 
 def process_repository(
         driver: Driver,
@@ -244,7 +215,7 @@ def process_repository(
     logger.info(f"Processing {repo.full_name}")
 
     """
-           WHAT WE ACTUALLY NEED TO DO:
+           TODO: WHAT WE ACTUALLY NEED TO DO:
 
            If we only find one package.json --> use that one
            If we find multiple package.json:
@@ -293,7 +264,6 @@ def process_repository(
         dependencies = parse_dependencies(package_jsons[0])
         print(dependencies)
 
-
         # Create graph transaction
         # with driver.session() as session:
         #    create_graph_transaction(session, repo, dependencies)
@@ -305,7 +275,7 @@ def process_repository(
         logger.error(f"Failed to process {repo.full_name}: {e}")
 
 
-def crawl_github_ecosystem(
+def crawl_github(
         driver: Driver,
         github_token: str,
         stars_query: str = ">10000",
@@ -314,18 +284,17 @@ def crawl_github_ecosystem(
     """Crawl GitHub repositories and build ecosystem graph"""
     github = Github(github_token)
 
-    # Search for JavaScript and TypeScript repositories
     query_js = f"stars:{stars_query} language:JavaScript"
     query_ts = f"stars:{stars_query} language:TypeScript"
 
     try:
         # Paginate through repositories
-        for repo in islice(github.search_repositories(query_js), max_repos):
+        for repo in islice(github.search_repositories(query_js), max_repos): # JavaScript
             process_repository(driver, repo)
-        for repo in islice(github.search_repositories(query_ts), max_repos):
+        for repo in islice(github.search_repositories(query_ts), max_repos): # TypeScript
             process_repository(driver, repo)
     except Exception as e:
-        logger.error(f"Error during GitHub ecosystem crawl: {e}")
+        logger.error(f"Error while crawling GitHub: {e}")
 
 
 def main() -> None:
@@ -340,7 +309,7 @@ def main() -> None:
 
     try:
         # Crawl GitHub ecosystem
-        crawl_github_ecosystem(
+        crawl_github(
             driver,
             os.getenv('GITHUB_TOKEN'),
             stars_query="1234",
