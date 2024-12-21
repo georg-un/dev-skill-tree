@@ -3,7 +3,7 @@ from typing import TypedDict, List
 import requests
 import psycopg
 
-from config import POSTGRES_CONFIG
+from stackoverflow.config import POSTGRES_CONFIG
 
 
 # StackExchange API parameters

@@ -1,7 +1,7 @@
 import psycopg
 import json
 
-from config import POSTGRES_CONFIG
+from stackoverflow.config import POSTGRES_CONFIG
 
 TAG_COUNT_THRESHOLD = 5000
 
@@ -38,10 +38,10 @@ def export_data():
     print(f"Number of tag-pairs: {len(tag_pairs)}.")
 
     # Save the results to JSON files
-    with open('./result/tag-pairs.json', 'w') as file:
+    with open('result/tag-pairs.json', 'w') as file:
         json.dump(tag_pairs, file, indent=2)
 
-    with open('./result/tags.json', 'w') as file:
+    with open('result/tags.json', 'w') as file:
         json.dump(resolved_tags, file, indent=2)
 
 

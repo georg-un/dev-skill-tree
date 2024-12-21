@@ -5,7 +5,7 @@ from collections.abc import KeysView
 
 import psycopg
 
-from config import POSTGRES_CONFIG
+from stackoverflow.config import POSTGRES_CONFIG
 from download import DOWNLOAD_FOLDER
 
 LOGFILE_PATH = "/tmp/load-into-db.log"

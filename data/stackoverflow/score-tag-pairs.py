@@ -1,6 +1,6 @@
 import psycopg
 
-from config import POSTGRES_CONFIG
+from stackoverflow.config import POSTGRES_CONFIG
 
 
 def score_tag_pairs() -> None:

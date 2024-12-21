@@ -1,4 +1,4 @@
-# Data
+# StackOverflow data
 
 Python project to download and transform the StackOverflow data from the [StackExchange dump (SEDE)](https://archive.org/download/stackexchange) on archive.org.
 
@@ -26,6 +26,7 @@ Additionally, you need around **200GB** free space on your hard drive.
    ```bash
    python install -r requirements.txt
    ````
+3. Create a `.env` file with the required configuration (see [.env.template](./.env.template)).
    
 ## Usage
 
@@ -38,12 +39,12 @@ For the full data pipeline, execute the following steps in the same order as the
          - _stackoverflow.com-Posts.7z_,
          - _stackoverflow.com-Tags.7z_,
          - _stackoverflow.com-Users.7z_,
-      3. After the download is complete, extract the XML files and place them in the folder [raw/](./raw).
+      3. After the download is complete, extract the XML files and place them in the folder [raw/](raw).
    - #### Option 2: Download the data with the downloader script:
       1. To download the StackOverflow dump from archive.org directly, you need to set your access credentials. 
          First, create an account on [archive.org](https://archive.org). 
       2. Follow [this guide](https://archive.org/developers/tutorial-get-ia-credentials.html#steps) to generate your credentials. 
-         Subsequently, set the respective values in [config.py](./config.py).
+         Subsequently, set the respective values in [config.py](config.py).
       3. Execute the downloader script to download the data:   
          ```bash
          python ./download.py
@@ -52,7 +53,7 @@ For the full data pipeline, execute the following steps in the same order as the
          Depending on where you live and how busy their servers are at the moment, this will either just take a very long time or fail completely.
 2. ### Create a Postgres database and load the data into it
    This guide uses _"postgres"_ as username and password and _"stackoverflow"_ as database name. If you want to use
-   a different configuration, change the values of the `POSTGRES_CONFIG` variable in [config.py](./config.py) and
+   a different configuration, change the values of the `POSTGRES_CONFIG` variable in [config.py](config.py) and
    adjust the commands in the following steps accordingly.
    1. First, create a new database:
       ```bash
@@ -94,7 +95,7 @@ For the full data pipeline, execute the following steps in the same order as the
    ```bash
    python ./export-data.py
    ```
-   This will create the files `tags.json` and `tag-pairs.json` in the folder [result/](./result).
+   This will create the files `tags.json` and `tag-pairs.json` in the folder [result/](result).
 7. ### Calculate the weight
    To stay flexible with how the weight is calculated, we have a separate step for that:
    ```bash
@@ -110,11 +111,11 @@ For the full data pipeline, execute the following steps in the same order as the
 
 The following filters are used in the course of the data pipeline and have an impact on the final result:
 
-- In [step 4](./README.md#filter-the-posts), before counting the tag pairs:
+- In [step 4](README.mdilter-the-posts), before counting the tag pairs:
   - Closed questions are removed.
   - Questions with a score lower than `-1` are removed.
   - Questions with no activity after `2018-01-01` are removed.
-- In [step 6](./README.md#export-the-data), when generating the result JSONs:
+- In [step 6](README.mdxport-the-data), when generating the result JSONs:
   - There's a tag count threshold of `5000`. 
   - Tags with a count smaller than the threshold are removed.
   - Tag pairs where one of the tags has a count smaller than the threshold are removed.

@@ -2,8 +2,7 @@ import os
 
 import internetarchive as ia
 import py7zr
-
-from config import INTERNET_ARCHIVE_ACCESS_KEY, INTERNET_ARCHIVE_SECRET_KET
+from dotenv import load_dotenv
 
 DOWNLOAD_FOLDER = "raw/"
 
@@ -17,7 +16,8 @@ FILES = (
 )
 
 # see https://internetarchive.readthedocs.io/en/stable/internetarchive.html#internetarchive.api.get_session
-CONFIG = dict(s3=dict(access=INTERNET_ARCHIVE_ACCESS_KEY, secret=INTERNET_ARCHIVE_SECRET_KET))
+load_dotenv()
+CONFIG = dict(s3=dict(access=os.getenv('INTERNET_ARCHIVE_ACCESS_KEY'), secret=os.getenv('INTERNET_ARCHIVE_SECRET_KET')))
 
 
 def download_all_files(archive: str, files: tuple[str], dest_dir: str, config: dict) -> None:
