@@ -4,12 +4,13 @@ import os
 from typing import Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
-from github import Github, GithubException
+from github import GithubException
 from github.ContentFile import ContentFile
 from github.Repository import Repository
 from neo4j import Driver, Session
 
 from connect_neo4j import connect_neo4j
+from repository_search import RepositorySearch
 from setup_logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -20,6 +21,7 @@ def find_package_jsons(
         max_depth: int = 3,
 ) -> List[ContentFile]:
     """Recursively find package.json files in a repository"""
+
     def search_contents(
             contents: List[ContentFile],
             current_depth: int = 0
@@ -51,7 +53,8 @@ def find_package_jsons(
         return []
 
 
-def parse_package_file_dependencies(package_file: ContentFile, root_package_file: Optional[ContentFile]) -> Dict[str, Dict[str, str]]:
+def parse_package_file_dependencies(package_file: ContentFile, root_package_file: Optional[ContentFile]) -> Dict[
+    str, Dict[str, str]]:
     """
     Take a package file and, optionally, its root package file and parse the dependencies.
     If a root package file is provided, the devDependencies of both files are merged in the final output.
@@ -60,6 +63,7 @@ def parse_package_file_dependencies(package_file: ContentFile, root_package_file
     :param root_package_file:   A root package file that can be provided in the case of a monorepo
     :return:                    A dictionary of dependencies and metadata, e.g. { dependencies: { lodash: 1.3.0 } }
     """
+
     def extract_deps(file: ContentFile) -> Dict[str, Dict[str, str]]:
         try:
             data = json.loads(file.decoded_content.decode('utf-8'))
@@ -76,7 +80,8 @@ def parse_package_file_dependencies(package_file: ContentFile, root_package_file
 
     if root_package_file:
         parsed_root_file = extract_deps(root_package_file)
-        parsed_file['devDependencies'] = {**parsed_root_file.get('devDependencies'), **parsed_file.get('devDependencies')}
+        parsed_file['devDependencies'] = {**parsed_root_file.get('devDependencies'),
+                                          **parsed_file.get('devDependencies')}
 
     return parsed_file
 
@@ -96,6 +101,7 @@ def store_in_database(
             - For each dep, create a node if it doesn't exist yet.
             - Create edges between nodes.
     """
+
     def upsert_repo_node(repo: Repository) -> None:
         """Upsert the repo information (stars, url, ...) of a package in the database"""
         session.run("""
@@ -222,23 +228,16 @@ def process_repository(
 def crawl_github(
         driver: Driver,
         github_token: str,
-        stars_query: str = ">10000",
+        min_stars: int,
 ) -> None:
     """Crawl GitHub repositories and build ecosystem graph"""
-    github = Github(github_token)
-
-    query_js = f"stars:{stars_query} language:JavaScript"
-    query_ts = f"stars:{stars_query} language:TypeScript"
-
     try:
-        js_repos = github.search_repositories(query_js)
-        ts_repos = github.search_repositories(query_ts)
-        logger.info(f"Processing {js_repos.totalCount} JavaScript and {ts_repos.totalCount} TypeScript repos.")
-
-        # Paginate through repositories
-        for repo in js_repos:
+        js_repo_search = RepositorySearch(github_token, min_stars, "JavaScript")
+        for repo in js_repo_search.query():
             process_repository(driver, repo)
-        for repo in ts_repos:
+
+        ts_repo_search = RepositorySearch(github_token, min_stars, "TypeScript")
+        for repo in ts_repo_search.query():
             process_repository(driver, repo)
 
     except Exception as e:
@@ -252,17 +251,15 @@ if __name__ == "__main__":
         Use their package.json files to create a dependency graph and store it in a Neo4j database.
         """
     )
-    parser.add_argument("--min_stars", type=int, help="Minimum number of stars a repo needs to have.")
+    parser.add_argument("--min_stars", type=int, required=True, help="Minimum number of stars a repo needs to have.")
     args = parser.parse_args()
-
-    stars_query = f">{args.min_stars}" if args.min_stars else "1234"
 
     load_dotenv()
     driver = connect_neo4j()
     github_token = os.getenv('GITHUB_TOKEN')
 
     try:
-        crawl_github(driver, github_token, stars_query)
+        crawl_github(driver, github_token, args.min_stars)
     except Exception as e:
         logger.error(f"Crawler failed: {e}")
     finally:

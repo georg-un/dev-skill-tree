@@ -41,4 +41,10 @@ Python project to crawl GitHub for JavaScript and TypeScript repositories and bu
    ```bash
    python3 ./2_calculate_co_occurrence --min_occurrence=100
    ```
-3. You can explore the Neo4j graph visually in the [Neo4j browser](http://localhost:7474/browser/) (URL depends on your configuration).
+   
+## Useful knowledge
+
+- You can explore the Neo4j graph visually in the [Neo4j browser](http://localhost:7474/browser/) (URL depends on your configuration).
+- To clear the database:
+  1. Run `match (a) -[r] -> () delete a, r`
+  2. and then `match (a) delete a`
